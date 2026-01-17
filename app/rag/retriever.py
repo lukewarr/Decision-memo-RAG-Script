@@ -20,14 +20,14 @@ select
     d.path,
     d.title,
     c.heading,
-    c.content,
+    c.content as content,
     c.start_char,
     c.end_char,
-    (e.embedding <=> :query embedding) as distance
-from embedding e
+    (e.embedding <=> cast(:query_embedding as vector)) as distance
+from embeddings e
 join chunks c on c.id = e.chunk_id
 join documents d on d.id = c.document_id
-order by e.embedding <=> : query embedding
+order by e.embedding <=> cast(:query_embedding as vector)
 limit :k;
 """
 
@@ -48,6 +48,7 @@ def retrieve_top_k(db: Session, query_embedding: str, k: int = 6) -> List[Retrie
             path = r["path"],
             title = r["title"],
             heading = r["heading"],
+            content=r["content"],
             start_char = r["start_char"],
             end_char = r["end_char"],
             distance = float(r["distance"]),
