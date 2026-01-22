@@ -15,6 +15,13 @@ def debug_retrieve(
 ):
     vec_literal = embed_text(q)
     hits = retrieve_top_k(db, query_embedding=vec_literal, k=k)
-    MAX_DEBUG_DISTANCE = 0.65
-    hits = [h for h in hits if h.distance is not None and h.distance <= MAX_DEBUG_DISTANCE]
-    return {"q": q, "k": k, "hits": [h.__dict__ for h in hits]}
+    best_distance = hits[0].distance if hits else None
+    weak_match = (best_distance is None) or (best_distance > 0.65)  # tune later
+
+    return {
+        "q": q,
+        "k": k,
+        "best_distance": best_distance,
+        "weak_match": weak_match,
+        "hits": [h.__dict__ for h in hits],
+    }
