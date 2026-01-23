@@ -27,7 +27,7 @@ This project prioritizes:
 - [x] Supabase Postgres + pgvector schema
 - [x] Ingest local folder → chunks + embeddings stored in DB
 - [x] Retrieval query returns relevant chunks
-- [ ] `/debug/retrieve` endpoint for retrieval debugging
+- [x] `/debug/retrieve` endpoint for retrieval debugging
 - [ ] `/ask` endpoint: answer + citations
 - [ ] “Insufficient evidence” gating
 - [ ] Basic metrics (latency, tokens, cost estimates)
