@@ -93,6 +93,25 @@ def ask(req: AskRequest, db: Session = Depends(get_db)):
     vec_literal = embed_text(q)
     hits = retrieve_top_k(db, query_embedding=vec_literal, k=req.k)
 
+    best_distance = hits[0].distance if hits else None
+
+    MAX_DISTANCE = float(os.getenv("RAG_MAX_DISTANCE", "0.65"))
+    MARGIN = float(os.getenv("RAG_CONTEXT_MARGIN", "0.08"))
+
+    if not hits or best_distance is None or best_distance > MAX_DISTANCE:
+        # insufficient evidence
+        ...
+
+    # keep only chunks close to the best hit
+    filtered_hits = [
+        h for h in hits
+        if h.distance is not None and h.distance <= (best_distance + MARGIN)
+    ]
+
+    # Always keep at least 2 chunks so the model has context
+    if len(filtered_hits) < 2:
+        filtered_hits = hits[:2]
+
     # --- Insufficient evidence gate (v1 heuristic) ---
     if not hits:
         return AskResponse(
