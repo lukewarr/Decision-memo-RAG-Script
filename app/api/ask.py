@@ -112,6 +112,13 @@ def ask(req: AskRequest, db: Session = Depends(get_db)):
     if len(filtered_hits) < 2:
         filtered_hits = hits[:2]
 
+    print({
+    "best_distance": best_distance,
+    "returned_hits": len(hits),
+    "filtered_hits": len(filtered_hits),
+    "paths": list({h.path for h in filtered_hits}),
+    })
+
     # --- Insufficient evidence gate (v1 heuristic) ---
     if not hits:
         return AskResponse(
