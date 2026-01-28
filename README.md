@@ -28,7 +28,7 @@ This project prioritizes:
 - [x] Ingest local folder → chunks + embeddings stored in DB
 - [x] Retrieval query returns relevant chunks
 - [x] `/debug/retrieve` endpoint for retrieval debugging
-- [ ] `/ask` endpoint: answer + citations
+- [x] `/ask` endpoint: answer + citations
 - [ ] “Insufficient evidence” gating
 - [ ] Basic metrics (latency, tokens, cost estimates)
 - [ ] Caching for query embeddings / retrieval results (optional)
