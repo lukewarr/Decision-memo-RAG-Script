@@ -278,7 +278,7 @@ def memo(req: MemoRequest, db: Session = Depends(get_db)):
     memo_json = _normalize_memo_json(raw_json)
 
     # ---- Map chunk_id citations back to full citation objects (flattened) ----
-    by_id = {h.chunk_id: h for h in hits}
+    by_id = {h.chunk_id: h for h in filtered_hits}
     cited_ids = _collect_chunk_ids(memo_json)
 
     full_citations: list[Citation] = []
