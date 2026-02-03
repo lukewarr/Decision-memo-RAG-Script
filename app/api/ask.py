@@ -1,6 +1,4 @@
-import json
 import os
-import random
 import time
 import uuid
 from typing import Any, Optional
@@ -11,6 +9,7 @@ from sqlalchemy.orm import Session
 from openai import OpenAI
 
 from app.core.db import get_db
+from app.core.llm_helpers import call_with_retry, extract_usage, format_sources, safe_json_load
 from app.rag.embed import embed_text
 from app.rag.retriever import retrieve_top_k, RetrievedChunk
 
@@ -57,72 +56,10 @@ class LlmAsk(BaseModel):
     citations: list[LlmCitation] = Field(default_factory=list)
 
 # -------------------------
-# Retry wrapper (Hardening #4)
+# LLM Call
 # -------------------------
-RETRIABLE_STATUS = {429, 500, 502, 503, 504}
-
-def _http_status_from_exc(e: Exception) -> Optional[int]:
-    # Best-effort; SDK exception shapes vary across versions
-    resp = getattr(e, "response", None)
-    if resp is not None:
-        return getattr(resp, "status_code", None)
-    return None
-
-def call_with_retry(fn, *, max_retries: int = 5, base_delay: float = 0.4, max_delay: float = 6.0):
-    last_err: Optional[Exception] = None
-    for attempt in range(max_retries + 1):
-        try:
-            return fn()
-        except Exception as e:
-            last_err = e
-            status = _http_status_from_exc(e)
-            if status not in RETRIABLE_STATUS or attempt == max_retries:
-                raise
-
-            # exponential backoff + jitter (0.5x–1.5x)
-            delay = min(max_delay, base_delay * (2 ** attempt))
-            delay *= (0.5 + random.random())
-            time.sleep(delay)
-    raise last_err  # should be unreachable
-
-# -------------------------
-# Helpers
-# -------------------------
-def _format_sources(hits: list[RetrievedChunk]) -> str:
-    blocks: list[str] = []
-    for i, h in enumerate(hits, start=1):
-        blocks.append(
-            f"[SOURCE {i} | chunk_id={h.chunk_id} | path={h.path} | heading={h.heading or ''}]\n"
-            f"{h.content}\n"
-        )
-    return "\n".join(blocks)
-
-def _extract_usage(resp: Any) -> dict[str, Any]:
-    usage = {}
-    try:
-        u = getattr(resp, "usage", None)
-        if u:
-            if isinstance(u, dict):
-                usage = u
-            else:
-                usage = {
-                    k: getattr(u, k)
-                    for k in ("input_tokens", "output_tokens", "total_tokens")
-                    if getattr(u, k, None) is not None
-                }
-    except Exception:
-        pass
-    return usage
-
-def _safe_json_load(text: str) -> dict[str, Any]:
-    try:
-        data = json.loads(text)
-        return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
-
 def _llm_answer_with_citations(client: OpenAI, question: str, context_hits: list[RetrievedChunk]) -> tuple[dict[str, Any], dict[str, Any]]:
-    sources_text = _format_sources(context_hits)
+    sources_text = format_sources(context_hits)
 
     system = (
         "You are a careful assistant answering ONLY from the provided SOURCES.\n"
@@ -153,7 +90,7 @@ def _llm_answer_with_citations(client: OpenAI, question: str, context_hits: list
 
     resp = call_with_retry(_call)
     text = (resp.output_text or "").strip()
-    return _safe_json_load(text), _extract_usage(resp)
+    return safe_json_load(text), extract_usage(resp)
 
 # -------------------------
 # Endpoint
@@ -210,7 +147,6 @@ def ask(req: AskRequest, db: Session = Depends(get_db)):
         h for h in valid_hits
         if h.distance is not None and h.distance <= (best_distance + RAG_CONTEXT_MARGIN)
     ]
-    # Always keep at least 2 chunks so the model has context
     if len(filtered_hits) < 2:
         filtered_hits = valid_hits[:2]
 
@@ -235,7 +171,6 @@ def ask(req: AskRequest, db: Session = Depends(get_db)):
             "filtered_hits": len(filtered_hits),
         })
 
-        # Fail closed: don’t ship hallucination-shaped answer
         top_cit = [Citation(**filtered_hits[0].__dict__)] if filtered_hits else []
         return AskResponse(
             answer="I couldn’t produce a valid grounded answer from the sources (LLM formatting error).",
@@ -255,11 +190,9 @@ def ask(req: AskRequest, db: Session = Depends(get_db)):
             citations.append(Citation(**allowed_by_id[c.chunk_id].__dict__))
 
     # Hardening #3: enforce citations on confident answers
-    # If model forgot citations (or cited disallowed IDs), force top filtered hit.
     if not citations and filtered_hits:
         citations = [Citation(**filtered_hits[0].__dict__)]
 
-    # If model gave an empty answer, be honest
     if not answer:
         answer = "I don’t have enough evidence in the indexed documents to answer that."
 
