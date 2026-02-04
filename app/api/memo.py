@@ -1,6 +1,4 @@
-import json
 import os
-import random
 import time
 import uuid
 from typing import Any, Optional
@@ -10,7 +8,9 @@ from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 from openai import OpenAI
 
+from app.rag.gating import gate_hits
 from app.core.db import get_db
+from app.core.llm_helpers import call_with_retry, extract_usage, format_sources, safe_json_load
 from app.rag.embed import embed_text
 from app.rag.retriever import retrieve_top_k, RetrievedChunk
 
@@ -64,17 +64,13 @@ class Citation(BaseModel):
     distance: Optional[float] = None
 
 class MemoResponse(BaseModel):
-    # Memo sections
     tldr: SectionWithCitations
     options_tradeoffs: list[OptionItem]
     risks_mitigations: list[RiskItem]
     open_questions: list[QuestionItem]
     what_would_change_my_mind: list[ChangeMindItem]
 
-    # Flattened, mapped to full objects (ONLY from filtered context)
-    citations: list[Citation]
-
-    # Product/debug fields
+    citations: list[Citation]  # flattened citations (ONLY from filtered context)
     best_distance: Optional[float] = None
     weak_match: bool = False
     hits: Optional[list[dict[str, Any]]] = None
@@ -116,85 +112,19 @@ class LlmMemo(BaseModel):
     what_would_change_my_mind: list[LlmChangeMind] = Field(default_factory=list)
 
 # -------------------------
-# Retry wrapper (Hardening #4)
-# -------------------------
-RETRIABLE_STATUS = {429, 500, 502, 503, 504}
-
-def _http_status_from_exc(e: Exception) -> Optional[int]:
-    # Best-effort; SDK exception shapes can vary across versions
-    resp = getattr(e, "response", None)
-    if resp is not None:
-        return getattr(resp, "status_code", None)
-    return None
-
-def call_with_retry(fn, *, max_retries: int = 5, base_delay: float = 0.4, max_delay: float = 6.0):
-    last_err: Optional[Exception] = None
-    for attempt in range(max_retries + 1):
-        try:
-            return fn()
-        except Exception as e:
-            last_err = e
-            status = _http_status_from_exc(e)
-            if status not in RETRIABLE_STATUS or attempt == max_retries:
-                raise
-
-            # exponential backoff + jitter (0.5x–1.5x)
-            delay = min(max_delay, base_delay * (2 ** attempt))
-            delay *= (0.5 + random.random())
-            time.sleep(delay)
-    raise last_err  # should be unreachable
-
-# -------------------------
 # Helpers
 # -------------------------
-def _format_sources(hits: list[RetrievedChunk]) -> str:
-    blocks: list[str] = []
-    for i, h in enumerate(hits, start=1):
-        blocks.append(
-            f"[SOURCE {i} | chunk_id={h.chunk_id} | path={h.path} | heading={h.heading or ''}]\n"
-            f"{h.content}\n"
-        )
-    return "\n".join(blocks)
-
-def _extract_usage(resp: Any) -> dict[str, Any]:
-    usage = {}
-    try:
-        u = getattr(resp, "usage", None)
-        if u:
-            if isinstance(u, dict):
-                usage = u
-            else:
-                usage = {
-                    k: getattr(u, k)
-                    for k in ("input_tokens", "output_tokens", "total_tokens")
-                    if getattr(u, k, None) is not None
-                }
-    except Exception:
-        pass
-    return usage
-
-def _safe_json_load(text: str) -> dict[str, Any]:
-    try:
-        data = json.loads(text)
-        return data if isinstance(data, dict) else {}
-    except Exception:
-        return {}
-
 def _mark_if_uncited(text: str, citations: list[LlmCitation]) -> str:
     if citations:
         return text
     if "insufficient evidence" in (text or "").lower():
         return text
-    # keep short & explicit
     return f"{text} (insufficient evidence in sources)".strip()
 
 def _collect_chunk_ids_from_llm(memo: LlmMemo) -> list[int]:
     ids: list[int] = []
-
-    # TLDR
     ids += [c.chunk_id for c in memo.tldr.citations]
 
-    # Lists
     for opt in memo.options_tradeoffs:
         ids += [c.chunk_id for c in opt.citations]
     for r in memo.risks_mitigations:
@@ -204,7 +134,6 @@ def _collect_chunk_ids_from_llm(memo: LlmMemo) -> list[int]:
     for w in memo.what_would_change_my_mind:
         ids += [c.chunk_id for c in w.citations]
 
-    # unique preserve order
     seen = set()
     uniq = []
     for x in ids:
@@ -213,8 +142,11 @@ def _collect_chunk_ids_from_llm(memo: LlmMemo) -> list[int]:
             uniq.append(x)
     return uniq
 
+# -------------------------
+# LLM Call
+# -------------------------
 def _llm_memo_with_citations(client: OpenAI, topic: str, context_hits: list[RetrievedChunk]) -> tuple[dict[str, Any], dict[str, Any]]:
-    sources_text = _format_sources(context_hits)
+    sources_text = format_sources(context_hits)
 
     system = (
         "You generate a decision memo using ONLY the provided SOURCES.\n"
@@ -251,7 +183,7 @@ def _llm_memo_with_citations(client: OpenAI, topic: str, context_hits: list[Retr
 
     resp = call_with_retry(_call)
     text = (resp.output_text or "").strip()
-    return _safe_json_load(text), _extract_usage(resp)
+    return safe_json_load(text), extract_usage(resp)
 
 # -------------------------
 # Endpoint
@@ -272,13 +204,22 @@ def memo(req: MemoRequest, db: Session = Depends(get_db)):
     hits = retrieve_top_k(db, query_embedding=vec_literal, k=req.k)
     t_ret1 = time.perf_counter()
 
-    # Safer: ignore None distances
+    gate = gate_hits(
+    hits,
+    max_distance=RAG_MAX_DISTANCE,
+    weak_band=float(os.getenv("RAG_WEAK_BAND", "0.05")),
+    min_gap=float(os.getenv("RAG_MIN_GAP", "0.03")),
+    )
+
+    best_distance = gate.best_distance
+    weak_match = gate.decision != "confident"
+
+# still keep valid_hits for filtering / fallback context selection
     valid_hits = [h for h in hits if h.distance is not None]
-    best_distance = valid_hits[0].distance if valid_hits else None
-    weak_match = (best_distance is None) or (best_distance > RAG_MAX_DISTANCE)
+
 
     # ---- Gate: insufficient evidence ----
-    if not valid_hits or best_distance is None or best_distance > RAG_MAX_DISTANCE:
+    if gate.decision == "insufficient":
         print({
             "event": "memo",
             "request_id": request_id,
@@ -292,7 +233,6 @@ def memo(req: MemoRequest, db: Session = Depends(get_db)):
             "total_ms": round((time.perf_counter() - t0) * 1000, 2),
         })
 
-        # Honest empty memo with optional top citation for debugging
         top_cit = [Citation(**valid_hits[0].__dict__)] if valid_hits else []
 
         return MemoResponse(
@@ -316,6 +256,9 @@ def memo(req: MemoRequest, db: Session = Depends(get_db)):
     if len(filtered_hits) < 2:
         filtered_hits = valid_hits[:2]
 
+    # Hardening #1: citations only from filtered context
+    allowed_by_id = {h.chunk_id: h for h in filtered_hits}
+
     # ---- LLM Memo ----
     client = OpenAI()
     t_llm0 = time.perf_counter()
@@ -334,7 +277,6 @@ def memo(req: MemoRequest, db: Session = Depends(get_db)):
             "filtered_hits": len(filtered_hits),
         })
 
-        # Fail closed: don’t ship a hallucination-shaped memo
         top_cit = [Citation(**filtered_hits[0].__dict__)] if filtered_hits else []
         return MemoResponse(
             tldr=SectionWithCitations(
@@ -353,24 +295,18 @@ def memo(req: MemoRequest, db: Session = Depends(get_db)):
         )
 
     # Hardening #3: enforce memo rules
-    # A) TL;DR must have ≥1 citation
     if not memo_obj.tldr.citations and filtered_hits:
         memo_obj.tldr.citations = [LlmCitation(chunk_id=filtered_hits[0].chunk_id)]
 
-    # B) Mark uncited items explicitly
     for item in memo_obj.open_questions:
         item.question = _mark_if_uncited(item.question, item.citations)
     for item in memo_obj.what_would_change_my_mind:
         item.item = _mark_if_uncited(item.item, item.citations)
 
-    # Hardening #1: citations only from filtered context
-    allowed_by_id = {h.chunk_id: h for h in filtered_hits}
-
     # Build flattened citation objects from memo citations (only allowed IDs)
     cited_ids = [cid for cid in _collect_chunk_ids_from_llm(memo_obj) if cid in allowed_by_id]
     full_citations: list[Citation] = [Citation(**allowed_by_id[cid].__dict__) for cid in cited_ids]
 
-    # If somehow still empty, force top filtered citation
     if not full_citations and filtered_hits:
         full_citations = [Citation(**filtered_hits[0].__dict__)]
 
@@ -390,7 +326,6 @@ def memo(req: MemoRequest, db: Session = Depends(get_db)):
         "usage": usage,
     })
 
-    # Convert memo_obj -> API response models
     return MemoResponse(
         tldr=SectionWithCitations(
             text=memo_obj.tldr.text,
