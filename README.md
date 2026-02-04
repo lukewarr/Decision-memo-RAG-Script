@@ -29,7 +29,7 @@ This project prioritizes:
 - [x] Retrieval query returns relevant chunks
 - [x] `/debug/retrieve` endpoint for retrieval debugging
 - [x] `/ask` endpoint: answer + citations
-- [ ] “Insufficient evidence” gating
+- [x] “Insufficient evidence” gating
 - [ ] Basic metrics (latency, tokens, cost estimates)
 - [ ] Caching for query embeddings / retrieval results (optional)
 
