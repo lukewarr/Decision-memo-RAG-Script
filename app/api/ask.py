@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 from openai import OpenAI
 
+from app.rag.gating import gate_hits
 from app.core.db import get_db
 from app.core.llm_helpers import call_with_retry, extract_usage, format_sources, safe_json_load
 from app.rag.embed import embed_text
@@ -111,10 +112,32 @@ def ask(req: AskRequest, db: Session = Depends(get_db)):
     hits = retrieve_top_k(db, query_embedding=vec_literal, k=req.k)
     t_ret1 = time.perf_counter()
 
+    gate = gate_hits(
+    hits,
+    max_distance=RAG_MAX_DISTANCE,
+    weak_band=float(os.getenv("RAG_WEAK_BAND", "0.05")),
+    min_gap=float(os.getenv("RAG_MIN_GAP", "0.03")),
+    )
+    best_distance = gate.best_distance
+    weak_match = gate.decision != "confident"
+
+
     # Safer: ignore None distances
+    if gate.decision == "insufficient":
+        top_cit = [Citation(**hits[0].__dict__)] if hits else []
+        return AskResponse(
+            answer=(
+                "I don’t have enough evidence in the indexed documents to answer that confidently.\n"
+                "If you can, point me to the doc/section that covers it (or add it to the corpus)."
+            ),
+            citations=top_cit,
+            best_distance=best_distance,
+            weak_match=True,
+            hits=[h.__dict__ for h in hits] if req.include_hits else None,
+            request_id=request_id,
+        )
     valid_hits = [h for h in hits if h.distance is not None]
-    best_distance = valid_hits[0].distance if valid_hits else None
-    weak_match = (best_distance is None) or (best_distance > RAG_MAX_DISTANCE)
+
 
     # ---- Gate: insufficient evidence ----
     if not valid_hits or best_distance is None or best_distance > RAG_MAX_DISTANCE:
