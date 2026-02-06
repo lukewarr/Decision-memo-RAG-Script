@@ -216,6 +216,8 @@ def memo(req: MemoRequest, db: Session = Depends(get_db)):
 
 # still keep valid_hits for filtering / fallback context selection
     valid_hits = [h for h in hits if h.distance is not None]
+    is_weak = (gate.decision == "weak")
+
 
 
     # ---- Gate: insufficient evidence ----
@@ -289,10 +291,12 @@ def memo(req: MemoRequest, db: Session = Depends(get_db)):
             what_would_change_my_mind=[ChangeMindItem(item="If a valid JSON memo is produced from the sources.", citations=[])],
             citations=top_cit,
             best_distance=best_distance,
-            weak_match=False,
+            weak_match=weak_match,
             hits=[h.__dict__ for h in hits] if req.include_hits else None,
             request_id=request_id,
         )
+    if is_weak:
+            memo_obj.tldr.text = "Note: evidence is partial / near-threshold.\n" + memo_obj.tldr.text
 
     # Hardening #3: enforce memo rules
     if not memo_obj.tldr.citations and filtered_hits:
@@ -314,7 +318,10 @@ def memo(req: MemoRequest, db: Session = Depends(get_db)):
         "event": "memo",
         "request_id": request_id,
         "best_distance": best_distance,
-        "weak_match": False,
+        "weak_match": weak_match,
+        "gate_decision": gate.decision,
+        "gate_reason": gate.reason,
+        "gate_gap": gate.gap,
         "returned_hits": len(hits),
         "valid_hits": len(valid_hits),
         "filtered_hits": len(filtered_hits),
@@ -363,7 +370,7 @@ def memo(req: MemoRequest, db: Session = Depends(get_db)):
         ],
         citations=full_citations,
         best_distance=best_distance,
-        weak_match=False,
+        weak_match=weak_match,
         hits=[h.__dict__ for h in hits] if req.include_hits else None,
         request_id=request_id,
     )
