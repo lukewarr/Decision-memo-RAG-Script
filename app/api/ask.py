@@ -124,7 +124,7 @@ def ask(req: AskRequest, db: Session = Depends(get_db)):
 
     # Safer: ignore None distances
     if gate.decision == "insufficient":
-        top_cit = [Citation(**hits[0].__dict__)] if hits else []
+        top_cit = [Citation(**valid_hits[0].__dict__)] if valid_hits else []
         return AskResponse(
             answer=(
                 "I don’t have enough evidence in the indexed documents to answer that confidently.\n"
@@ -137,33 +137,6 @@ def ask(req: AskRequest, db: Session = Depends(get_db)):
             request_id=request_id,
         )
     valid_hits = [h for h in hits if h.distance is not None]
-
-
-    # ---- Gate: insufficient evidence ----
-    if not valid_hits or best_distance is None or best_distance > RAG_MAX_DISTANCE:
-        print({
-            "event": "ask",
-            "request_id": request_id,
-            "best_distance": best_distance,
-            "weak_match": True,
-            "returned_hits": len(hits),
-            "valid_hits": len(valid_hits),
-            "filtered_hits": 0,
-            "embed_ms": round((t_embed1 - t_embed0) * 1000, 2),
-            "retrieval_ms": round((t_ret1 - t_ret0) * 1000, 2),
-            "total_ms": round((time.perf_counter() - t0) * 1000, 2),
-        })
-
-        top_cit = [Citation(**valid_hits[0].__dict__)] if valid_hits else []
-
-        return AskResponse(
-            answer="I don’t have enough evidence in the indexed documents to answer that confidently.",
-            citations=top_cit,
-            best_distance=best_distance,
-            weak_match=True,
-            hits=[h.__dict__ for h in hits] if req.include_hits else None,
-            request_id=request_id,
-        )
 
     # ---- Context filter (best + margin) ----
     filtered_hits = [
@@ -199,13 +172,16 @@ def ask(req: AskRequest, db: Session = Depends(get_db)):
             answer="I couldn’t produce a valid grounded answer from the sources (LLM formatting error).",
             citations=top_cit,
             best_distance=best_distance,
-            weak_match=False,
+            weak_match=weak_match,
             hits=[h.__dict__ for h in hits] if req.include_hits else None,
             request_id=request_id,
         )
 
     answer = (llm_obj.answer or "").strip()
 
+    if gate.decision == "weak":
+        answer = "Note: evidence is partial / near-threshold.\n" + answer
+        
     # Map citations -> full objects, but ONLY if allowed
     citations: list[Citation] = []
     for c in llm_obj.citations:
@@ -223,7 +199,10 @@ def ask(req: AskRequest, db: Session = Depends(get_db)):
         "event": "ask",
         "request_id": request_id,
         "best_distance": best_distance,
-        "weak_match": False,
+        "weak_match": weak_match,
+        "gate_decision": gate.decision,
+        "gate_reason": gate.reason,
+        "gate_gap": gate.gap,
         "returned_hits": len(hits),
         "valid_hits": len(valid_hits),
         "filtered_hits": len(filtered_hits),
@@ -239,7 +218,7 @@ def ask(req: AskRequest, db: Session = Depends(get_db)):
         answer=answer,
         citations=citations,
         best_distance=best_distance,
-        weak_match=False,
+        weak_match=weak_match,
         hits=[h.__dict__ for h in hits] if req.include_hits else None,
         request_id=request_id,
     )
