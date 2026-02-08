@@ -22,6 +22,7 @@ def gate_hits(
     valid = [h for h in hits if getattr(h, "distance", None) is not None]
     if not valid:
         return GateResult("insufficient", None, None, "no_valid_hits")
+    valid.sort(key=lambda h: h.distance)
 
     best = valid[0].distance
     second = valid[1].distance if len(valid) > 1 else None
