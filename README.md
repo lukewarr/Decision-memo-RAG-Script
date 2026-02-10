@@ -30,8 +30,8 @@ This project prioritizes:
 - [x] `/debug/retrieve` endpoint for retrieval debugging
 - [x] `/ask` endpoint: answer + citations
 - [x] “Insufficient evidence” gating
-- [ ] Basic metrics (latency, tokens, cost estimates)
-- [ ] Caching for query embeddings / retrieval results (optional)
+- [x] Basic metrics (latency, tokens, cost estimates)
+- [x] Caching for query embeddings / retrieval results (optional)
 
 **Phase 2 — Evaluation Harness**
 - [ ] Regression tests for retrieval/citation accuracy
