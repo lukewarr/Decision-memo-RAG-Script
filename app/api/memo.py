@@ -208,7 +208,8 @@ def memo(req: MemoRequest, db: Session = Depends(get_db)):
 
     # ---- Embedding (cached) ----
     t_embed0 = time.perf_counter()
-    embed_key = stable_key("embed", topic)
+    EMBED_MODEL = os.getenv("EMBED_MODEL", "text-embedding-3-small")
+    embed_key = stable_key("embed", EMBED_MODEL,topic)
     vec_literal = _embed_cache.get(embed_key)
     embed_cache_hit = vec_literal is not None
     if vec_literal is None:
