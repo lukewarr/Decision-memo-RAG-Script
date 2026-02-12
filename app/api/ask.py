@@ -115,9 +115,25 @@ def ask(req: AskRequest, db: Session = Depends(get_db)):
 
     q = req.question.strip()
 
+    # Guard: very short queries are often ambiguous in embedding space
+    MIN_CHARS = int(os.getenv("RAG_MIN_QUERY_CHARS", "6"))
+    if len(q) < MIN_CHARS:
+        return AskResponse(
+            answer=(
+                "That query is too short / ambiguous for semantic search. "
+                "Try adding a few more words (e.g., '429 rate limit during demo timeline')."
+            ),
+            citations=[],
+            best_distance=None,
+            weak_match=True,
+            hits=None if not req.include_hits else [],
+            request_id=request_id,
+        )
+
     # ---- Embedding (cached) ----
     t_embed0 = time.perf_counter()
-    embed_key = stable_key("embed", q)
+    EMBED_MODEL = os.getenv("EMBED_MODEL", "text-embedding-3-small")
+    embed_key = stable_key("embed", EMBED_MODEL,q)
     vec_literal = _embed_cache.get(embed_key)
     embed_cache_hit = vec_literal is not None
     if vec_literal is None:
