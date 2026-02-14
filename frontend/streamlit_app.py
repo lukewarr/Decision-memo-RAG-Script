@@ -6,7 +6,7 @@ import streamlit as st
 BACKEND_URL = os.getenv("DM_RAG_BACKEND_URL", "http://localhost:8000")
 
 st.set_page_config(page_title="Decision Memo RAG", layout="wide")
-st.title("Decision Memo RAG — Mini App")
+st.title("Decision Memo RAG")
 
 # -------------------------
 # Helpers
