@@ -33,7 +33,12 @@ This project prioritizes:
 - [x] Basic metrics (latency, tokens, cost estimates)
 - [x] Caching for query embeddings / retrieval results (optional)
 
-**Phase 2 — Evaluation Harness**
+**Phase 2 - Frontend development**
+- [x] Developed ingestion landing page
+- [x] Developed processing landing page (ask/memo)
+- [ ] Refine page & process
+
+**Phase 3 — Evaluation Harness**
 - [ ] Regression tests for retrieval/citation accuracy
 - [ ] Prompt robustness tests
 - [ ] Cost/latency drift detection
