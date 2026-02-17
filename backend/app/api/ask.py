@@ -4,7 +4,7 @@ import uuid
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, ConfigDict
 from sqlalchemy.orm import Session
 from openai import OpenAI
 
@@ -15,6 +15,9 @@ from app.core.cache import TTLCache, stable_key
 from app.core.metrics import estimate_cost_usd
 from app.rag.embed import embed_text
 from app.rag.retriever import retrieve_top_k, RetrievedChunk
+from app.schemas.rag import AskResponse, Hit
+from app.services.rag_format import build_citations_from_hits
+
 
 router = APIRouter(tags=["rag"])
 
@@ -32,27 +35,29 @@ _retr_cache = TTLCache(ttl_seconds=RETR_TTL_S, max_items=2048)
 # -------------------------
 # API Models
 # -------------------------
-class AskRequest(BaseModel):
-    question: str = Field(..., min_length=1)
-    k: int = Field(6, ge=1, le=20)
-    include_hits: bool = False  # handy during dev
 
 class Citation(BaseModel):
-    chunk_id: int
-    path: str
+    model_config = ConfigDict(extra="ignore")  # <-- KEY: ignore extra keys in __dict__
+
+    # Make path non-fatal if missing in some flows
+    path: str = ""
+
     title: Optional[str] = None
     heading: Optional[str] = None
+    chunk_id: Optional[int] = None
+
+    # Add fields you already use everywhere
     start_char: Optional[int] = None
     end_char: Optional[int] = None
     distance: Optional[float] = None
 
-class AskResponse(BaseModel):
-    answer: str
-    citations: list[Citation]
-    best_distance: Optional[float] = None
-    weak_match: bool = False
-    hits: Optional[list[dict[str, Any]]] = None
-    request_id: str
+    # Nice for UI
+    excerpt: Optional[str] = None
+    
+class AskRequest(BaseModel):
+    question: str = Field(..., min_length=1)
+    k: int = Field(6, ge=1, le=20)
+    include_hits: bool = False  # handy during dev
 
 # -------------------------
 # LLM Output Models
@@ -289,12 +294,16 @@ def ask(req: AskRequest, db: Session = Depends(get_db)):
         "usage": usage,
         "cost_usd": round(cost_usd, 6),
     })
+    hits_dicts = [h.__dict__ for h in hits]
+    citations = build_citations_from_hits(hits)
+    gating = gate.decision  # "confident" | "weak" | "insufficient"
+
 
     return AskResponse(
-        answer=answer,
-        citations=citations,
-        best_distance=best_distance,
-        weak_match=weak_match,
-        hits=[h.__dict__ for h in hits] if req.include_hits else None,
-        request_id=request_id,
-    )
+    answer=answer,
+    gating=gating,
+    best_distance=best_distance,
+    weak_match=bool(weak_match),
+    citations=citations,
+    hits=[Hit(**h) for h in hits] if req.include_hits else None,
+)
