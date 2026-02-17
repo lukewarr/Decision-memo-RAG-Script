@@ -31,6 +31,44 @@ def post_json(path: str, payload: dict):
 def short_query_guard(s: str, min_chars: int = 6) -> bool:
     return len((s or "").strip()) >= min_chars
 
+def render_citations(citations: list):
+    if not citations:
+        st.caption("No citations returned.")
+        return
+
+    st.markdown("### Citations")
+    for i, c in enumerate(citations, start=1):
+        title = c.get("title") or c.get("path") or "source"
+        heading = c.get("heading")
+        dist = c.get("distance")
+
+        line = f"**[{i}] {title}**"
+        if heading:
+            line += f" — _{heading}_"
+        if dist is not None:
+            line += f"  \nDistance: `{dist:.4f}`" if isinstance(dist, (int, float)) else f"  \nDistance: `{dist}`"
+
+        st.markdown(line)
+
+        excerpt = c.get("excerpt")
+        if excerpt:
+            with st.expander(f"Show snippet [{i}]", expanded=False):
+                st.write(excerpt)
+
+def render_hits(hits: list):
+    if not hits:
+        st.caption("No hits.")
+        return
+    with st.expander("Hits (debug)", expanded=False):
+        for i, h in enumerate(hits, start=1):
+            path = h.get("title") or h.get("path") or "hit"
+            dist = h.get("distance")
+            st.markdown(f"**#{i}** {path}" + (f" — `{dist:.4f}`" if isinstance(dist, (int, float)) else ""))
+            content = h.get("content") or ""
+            if content:
+                st.code(content[:600] + ("…" if len(content) > 600 else ""))
+
+
 # -------------------------
 # Top status bar
 # -------------------------
