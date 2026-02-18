@@ -171,7 +171,7 @@ with tab_analyze:
                     # Expected fields per your backend behavior:
                     # answer, citations, best_distance, weak_match, gating
                     st.subheader("Answer")
-                    st.write(res.get("answer", ""))
+                    st.markdown(res.get("answer", ""))
 
                     meta = st.columns(3)
                     meta[0].metric("best_distance", res.get("best_distance", None))
