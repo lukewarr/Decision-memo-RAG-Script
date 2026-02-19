@@ -206,6 +206,25 @@ with tab_analyze:
 
                     st.subheader("Memo")
                     # Prefer structured sections if backend returns them
+                    sections = res.get("sections", {}) or {}
+
+                    order = [
+                        ("tldr", "TL;DR"),
+                        ("options_tradeoffs", "Options / Tradeoffs"),
+                        ("risks_mitigations", "Risks / Mitigations"),
+                        ("open_questions", "Open Questions"),
+                        ("what_would_change_my_mind", "What would change my mind"),
+                    ]
+
+                    if isinstance(sections, dict):
+                        for key, title in order:
+                            txt = sections.get(key)
+                            if txt:
+                                st.markdown(f"### {title}")
+                                st.markdown(txt)   # <-- use markdown, not st.write
+                    else:
+                        # fallback if backend returns memo as a string
+                        st.markdown(res.get("memo", ""))
                     sections = res.get("sections")
                     if isinstance(sections, dict):
                         for key in ["tldr", "options_tradeoffs", "risks_mitigations", "open_questions", "what_would_change_my_mind"]:
