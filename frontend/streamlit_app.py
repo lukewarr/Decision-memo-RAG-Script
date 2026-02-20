@@ -225,15 +225,6 @@ with tab_analyze:
                     else:
                         # fallback if backend returns memo as a string
                         st.markdown(res.get("memo", ""))
-                    sections = res.get("sections")
-                    if isinstance(sections, dict):
-                        for key in ["tldr", "options_tradeoffs", "risks_mitigations", "open_questions", "what_would_change_my_mind"]:
-                            if key in sections and sections[key]:
-                                st.markdown(f"### {key.replace('_', ' ').upper()}")
-                                st.write(sections[key])
-                    else:
-                        # Fallback if backend returns a single memo string
-                        st.write(res.get("memo", ""))
 
                     meta = st.columns(3)
                     meta[0].metric("best_distance", res.get("best_distance", None))
