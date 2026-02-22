@@ -230,14 +230,9 @@ with tab_analyze:
                     meta[0].metric("best_distance", res.get("best_distance", None))
                     meta[1].metric("weak_match", res.get("weak_match", None))
                     meta[2].metric("gating", res.get("gating", ""))
-
-                    if res.get("citations"):
-                        st.subheader("Citations")
-                        st.json(res["citations"])
-
-                    if show_hits and res.get("hits"):
-                        with st.expander("Hits", expanded=False):
-                            st.json(res["hits"])
+                    render_citations(res.get("citations", []))
+                    if show_hits:
+                        render_hits(res.get("hits", []))
 
                     with st.expander("Raw response", expanded=False):
                         st.json(res)
