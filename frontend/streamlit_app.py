@@ -88,7 +88,7 @@ with tab_ingest:
         st.subheader("Upload documents")
         files = st.file_uploader(
             "Upload .md or .txt files",
-            type=["md", "txt"],
+            type=["md", "txt", "pdf"],
             accept_multiple_files=True
         )
 
