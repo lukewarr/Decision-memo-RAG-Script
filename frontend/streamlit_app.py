@@ -179,7 +179,7 @@ with tab_analyze:
                     meta[2].metric("gating", res.get("gating", ""))  # confident|weak|insufficient
 
                     render_citations(res.get("citations", []))
-                    if show_hits:
+                    if show_hits and include_hits:
                         render_hits(res.get("hits", []))
 
                     with st.expander("Raw response", expanded=False):
@@ -227,7 +227,7 @@ with tab_analyze:
                     meta[1].metric("weak_match", res.get("weak_match", None))
                     meta[2].metric("gating", res.get("gating", ""))
                     render_citations(res.get("citations", []))
-                    if show_hits:
+                    if show_hits and include_hits:
                         render_hits(res.get("hits", []))
 
                     with st.expander("Raw response", expanded=False):
