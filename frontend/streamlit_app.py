@@ -173,10 +173,15 @@ with tab_analyze:
                     st.subheader("Answer")
                     st.markdown(res.get("answer", ""))
 
-                    meta = st.columns(3)
-                    meta[0].metric("best_distance", res.get("best_distance", None))
-                    meta[1].metric("weak_match", res.get("weak_match", None))
-                    meta[2].metric("gating", res.get("gating", ""))  # confident|weak|insufficient
+                    g = res.get("gating", "")
+                    if g == "confident":
+                        st.success("confident")
+                    elif g == "weak":
+                        st.warning("weak")
+                    elif g == "insufficient":
+                        st.error("insufficient")
+                    else:
+                        st.info(g or "—")
 
                     render_citations(res.get("citations", []))
                     if show_hits and include_hits:
@@ -222,11 +227,15 @@ with tab_analyze:
                         # fallback if backend returns memo as a string
                         st.markdown(res.get("memo", ""))
 
-                    meta = st.columns(3)
-                    meta[0].metric("best_distance", res.get("best_distance", None))
-                    meta[1].metric("weak_match", res.get("weak_match", None))
-                    meta[2].metric("gating", res.get("gating", ""))
-                    render_citations(res.get("citations", []))
+                    g = res.get("gating", "")
+                    if g == "confident":
+                        st.success("confident")
+                    elif g == "weak":
+                        st.warning("weak")
+                    elif g == "insufficient":
+                        st.error("insufficient")
+                    else:
+                        st.info(g or "—")
                     if show_hits and include_hits:
                         render_hits(res.get("hits", []))
 
