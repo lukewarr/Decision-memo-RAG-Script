@@ -1,19 +1,26 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Literal, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 Gating = Literal["confident", "weak", "insufficient"]
 
 
 class Citation(BaseModel):
-    path: str
+    model_config = ConfigDict(extra="ignore")  # ignore extra keys from __dict__
+
+    path: str = ""  # default avoids “field required” edge cases
     title: Optional[str] = None
     heading: Optional[str] = None
     chunk_id: Optional[int] = None
+
+    # Add these because your chunks/hits often have them and they’re useful in UI
+    start_char: Optional[int] = None
+    end_char: Optional[int] = None
+
     distance: Optional[float] = None
-    excerpt: Optional[str] = None  # short snippet for UI
+    excerpt: Optional[str] = None
 
 
 class Hit(BaseModel):
