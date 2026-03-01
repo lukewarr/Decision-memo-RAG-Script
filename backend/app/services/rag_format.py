@@ -11,10 +11,6 @@ def _safe_excerpt(text: Optional[str], limit: int = 280) -> Optional[str]:
     return t[:limit].rstrip() + "…"
 
 def build_citations_from_hits(hits: List[Dict[str, Any]], max_items: int = 8) -> List[Citation]:
-    """
-    Dedupe citations so UI looks clean.
-    Assumes hits may contain: path/title/heading/chunk_id/content/distance
-    """
     out: List[Citation] = []
     seen: set[Tuple[str, Optional[int], Optional[str]]] = set()
 
@@ -28,13 +24,22 @@ def build_citations_from_hits(hits: List[Dict[str, Any]], max_items: int = 8) ->
             continue
         seen.add(key)
 
+        raw_dist = h.get("distance")
+        if isinstance(raw_dist, (int, float)):
+            dist = float(raw_dist)
+        else:
+            raw_score = h.get("score")
+            dist = float(raw_score) if isinstance(raw_score, (int, float)) else None
+
         out.append(
             Citation(
                 path=path,
                 title=h.get("title"),
                 heading=heading,
                 chunk_id=chunk_id,
-                distance=h.get("distance") if isinstance(h.get("distance"), (int, float)) else h.get("score"),
+                start_char=h.get("start_char"),
+                end_char=h.get("end_char"),
+                distance=dist,
                 excerpt=_safe_excerpt(h.get("content")),
             )
         )
