@@ -15,7 +15,7 @@ from app.core.cache import TTLCache, stable_key
 from app.core.metrics import estimate_cost_usd
 from app.rag.embed import embed_text
 from app.rag.retriever import retrieve_top_k, RetrievedChunk
-from app.schemas.rag import AskResponse, Hit
+from app.schemas.rag import AskResponse, Hit, Citation
 from app.services.rag_format import build_citations_from_hits
 
 
