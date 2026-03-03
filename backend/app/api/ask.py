@@ -188,7 +188,8 @@ def ask(req: AskRequest, db: Session = Depends(get_db)):
             "total_ms": round((time.perf_counter() - t0) * 1000, 2),
         })
 
-        top_cit = [Citation(**valid_hits[0].__dict__)] if valid_hits else []
+        hits_dicts = [h.__dict__ for h in valid_hits]
+        top_cit = build_citations_from_hits(hits_dicts, max_items=1) if valid_hits else []
         return AskResponse(
             answer=(
                 "I don’t have enough evidence in the indexed documents to answer that confidently.\n"
