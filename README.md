@@ -45,6 +45,67 @@ This project prioritizes:
 - [ ] Failure mode detection + reporting
 
 ---
+## Key RAG Constraints / “Hard Teaches”
 
-## Repo Structure (Current / Intended)
+The system enforces a **distance-gated** retrieval policy to avoid hallucinated answers:
+
+- `RAG_MAX_DISTANCE` (default ~0.65): beyond this is generally **insufficient**
+- `RAG_CONTEXT_MARGIN` (default ~0.08): include context hits within `(best_distance + margin)`
+- Gating outputs: `confident | weak | insufficient`
+- Recommended short-query guard: block ambiguous queries under ~6 chars (configurable)
+
+These constraints are intentionally simple and debuggable.
+
+---
+
+## API (Local Dev)
+
+### Ingest
+**POST `/ingest`** (multipart form-data)
+- Field name: `files` (repeatable)
+- Returns:
+  - `files_received`, `files_ingested`, `files_skipped` (if enabled)
+  - `chunks_created`, `embeddings_written`
+  - `errors`
+  - `last_ingest_time`
+
+### Corpus Stats
+**GET `/corpus/stats`**
+- Returns:
+  - `total_docs`, `total_chunks`, `last_ingest_time`
+
+### Ask (RAG QA)
+**POST `/ask`**
+- Request:
+  - `question: str`
+  - `k: int`
+  - `include_hits: bool` (optional)
+- Response (intended stable shape):
+  - `answer: str`
+  - `gating: confident|weak|insufficient`
+  - `best_distance: float | null`
+  - `weak_match: bool`
+  - `citations: [...]`
+  - `hits: [...]` (optional)
+
+### Memo (GEN)
+**POST `/memo`**
+- Request:
+  - `topic: str`
+  - `k: int`
+  - `include_hits: bool` (optional)
+- Response (intended stable shape):
+  - `sections: {tldr, options_tradeoffs, risks_mitigations, open_questions, what_would_change_my_mind}`
+  - `gating`, `best_distance`, `weak_match`, `citations`
+  - `hits` optional
+
+---
+
+## Running Locally
+
+### 1) Backend
+From the `backend/` directory:
+
+```bash
+uvicorn app.main:app --reload --port 8000
 
