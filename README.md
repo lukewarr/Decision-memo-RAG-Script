@@ -108,4 +108,62 @@ From the `backend/` directory:
 
 ```bash
 uvicorn app.main:app --reload --port 8000
+```
 
+### Repo struct
+decision-memo-rag/
+├─ README.md
+├─ .env
+├─ .env.example
+├─ .gitignore
+│
+├─ backend/
+│  ├─ requirements.txt
+│  ├─ app/
+│  │  ├─ main.py
+│  │  │
+│  │  ├─ api/
+│  │  │  ├─ ask.py
+│  │  │  ├─ memo.py
+│  │  │  ├─ ingest.py
+│  │  │  ├─ corpus.py
+│  │  │  └─ debug.py
+│  │  │
+│  │  ├─ core/
+│  │  │  ├─ db.py
+│  │  │  ├─ llm_helpers.py
+│  │  │  ├─ cache.py
+│  │  │  └─ metrics.py
+│  │  │
+│  │  ├─ rag/
+│  │  │  ├─ embed.py
+│  │  │  ├─ retriever.py
+│  │  │  └─ gating.py
+│  │  │
+│  │  ├─ schemas/
+│  │  │  └─ rag.py
+│  │  │
+│  │  └─ services/
+│  │     ├─ ingest_service.py
+│  │     └─ rag_format.py
+│  │
+│  └─ scripts/
+│     └─ ingest_folder.py
+│
+├─ frontend/
+│  ├─ requirements.txt
+│  └─ streamlit_app.py
+│
+├─ data/
+│  ├─ test_demo/
+│  │  ├─ 01_intro.md
+│  │  ├─ 02_architecture.md
+│  │  ├─ 03_decision_log.md
+│  │  └─ 04_postmortem_rate_limit.md
+│  └─ uploads/              # optional local staging area
+│
+└─ docs/
+   ├─ architecture.md
+   ├─ api_contracts.md
+   ├─ retrieval_notes.md
+   └─ roadmap.md
