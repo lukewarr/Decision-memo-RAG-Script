@@ -1,0 +1,10 @@
+{"id":"rate-limit-timeline","query":"What caused the demo to fail due to 429 errors, and what fixed it? Provide the timeline.","k":8,"expected_paths":["postmortem","rate_limit","429"],"max_best_distance":0.65}
+{"id":"rate-limit-root-cause","query":"Why did repeated /ask calls trigger bursts of 429 responses?","k":8,"expected_paths":["postmortem","rate_limit","429"],"max_best_distance":0.65}
+{"id":"gating-thresholds","query":"What are the gating thresholds and what do confident, weak, and insufficient mean?","k":8,"expected_paths":["gating","RAG_MAX_DISTANCE","RAG_CONTEXT_MARGIN"],"max_best_distance":0.75}
+{"id":"context-margin","query":"How does the context margin work (best_distance + margin), and why is overlap used?","k":8,"expected_paths":["RAG_CONTEXT_MARGIN","margin","overlap"],"max_best_distance":0.85}
+{"id":"ingest-hash-skip","query":"How does ingestion skip unchanged documents and what hash is used?","k":8,"expected_paths":["content_hash","sha256","skip"],"max_best_distance":0.85}
+{"id":"chunking-markdown","query":"How are markdown files chunked (headings/paragraphs) and what are the max/overlap defaults?","k":8,"expected_paths":["chunk","MAX_CHARS","OVERLAP_CHARS","heading"],"max_best_distance":0.85}
+{"id":"embed-model-dim","query":"Which embedding model is used and what vector dimension is stored?","k":8,"expected_paths":["text-embedding-3-small","1536","EMBED_DIM"],"max_best_distance":0.85}
+{"id":"pgvector-storage","query":"How are embeddings inserted into Postgres/pgvector (casting, literal format)?","k":8,"expected_paths":["pgvector","::vector","embedding"],"max_best_distance":0.90}
+{"id":"short-query-guard","query":"Why do short queries get blocked and what is the default minimum character guard?","k":8,"expected_paths":["MIN_CHARS","RAG_MIN_QUERY_CHARS","short"],"max_best_distance":0.95}
+{"id":"retrieve-debug","query":"What does /debug/retrieve return and how should it be used to tune k and gating?","k":8,"expected_paths":["debug","retrieve","top-k"],"max_best_distance":0.95}
