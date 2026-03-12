@@ -1,7 +1,7 @@
 import argparse
 from typing import Any, Dict, List
 
-from backend.scripts.eval_utils import (
+from scripts.eval_utils import (
     read_jsonl,
     write_json,
     write_text,
