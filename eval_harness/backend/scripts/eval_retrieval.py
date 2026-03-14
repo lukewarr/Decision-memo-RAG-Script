@@ -13,6 +13,7 @@ from eval_utils import (
     summarize_table,
 )
 
+
 def call_debug_retrieve(backend: str, query: str, k: int) -> Dict[str, Any]:
     # Try common payload shapes (your debug endpoint may use query vs question)
     url = backend.rstrip("/") + "/debug/retrieve"
