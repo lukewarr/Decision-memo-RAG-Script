@@ -39,10 +39,10 @@ This project prioritizes:
 - [ ] Refine page & process
 
 **Phase 3 — Evaluation Harness**
-- [ ] Regression tests for retrieval/citation accuracy
-- [ ] Prompt robustness tests
-- [ ] Cost/latency drift detection
-- [ ] Failure mode detection + reporting
+- [x] Regression tests for retrieval/citation accuracy
+- [x] Prompt robustness tests
+- [x] Cost/latency drift detection
+- [x] Failure mode detection + reporting
 
 ---
 ## Key RAG Constraints / “Hard Teaches”
